@@ -11,13 +11,16 @@ data_threads = {
 }
 
 data_clients = {
-    "Nº de Clientes": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-    "Total Time Taken (s)": [3, 6, 10, 19, 42, 65, 97, 141, 163, 228],
-    "Memory Used (MB)": [6, 8, 12, 15, 17, 18, 20, 30, 39, 44]
+    "Nº de Clientes": [1, 5, 10, 50, 100],
+    "Total Time Taken (s)": [0.108, 1.124, 3.622, 52.097, 103.062],
+    "Memory Used (MB)": [1, 8, 14, 54, 120]
 }
 
 df_threads = pd.DataFrame(data_threads)
 df_clients = pd.DataFrame(data_clients)
+
+# Escalar os valores de threads para evitar overflow
+df_threads["Scaled Threads"] = df_threads["Nº de Threads"] / 100
 
 # Função para ajuste exponencial
 def exponential_func(x, a, b):
@@ -32,48 +35,77 @@ def confidence_interval(popt, pcov, alpha=0.05):
     ci = t_val * errors  # intervalo de confiança
     return ci
 
+# Função para calcular p-values
+def calculate_p_values(popt, pcov):
+    dof = max(0, len(df_threads) - len(popt))  # graus de liberdade
+    errors = np.sqrt(np.diag(pcov))
+    t_stats = np.abs(popt / errors)
+    p_values = (1 - t.cdf(t_stats, dof)) * 2
+    return p_values
+
 # Ajuste para 'Nº de Threads vs Total Time Taken'
-popt_time_threads, pcov_time_threads = curve_fit(exponential_func, df_threads["Nº de Threads"], df_threads["Total Time Taken (s)"])
-ci_time_threads = confidence_interval(popt_time_threads, pcov_time_threads)
+try:
+    popt_time_threads, pcov_time_threads = curve_fit(
+        exponential_func, df_threads["Scaled Threads"], df_threads["Total Time Taken (s)"]
+    )
+    ci_time_threads = confidence_interval(popt_time_threads, pcov_time_threads)
+    p_values_time_threads = calculate_p_values(popt_time_threads, pcov_time_threads)
+    r2_time_threads = np.corrcoef(df_threads["Total Time Taken (s)"], exponential_func(df_threads["Scaled Threads"], *popt_time_threads))[0, 1] ** 2
+except Exception as e:
+    popt_time_threads, ci_time_threads, p_values_time_threads, r2_time_threads = [None, None], [None, None], [None, None], None
+    print(f"Erro no ajuste para Nº de Threads vs Total Time Taken: {e}")
 
 # Ajuste para 'Nº de Threads vs Memory Used by Threads'
-popt_memory_threads, pcov_memory_threads = curve_fit(exponential_func, df_threads["Nº de Threads"], df_threads["Memory Used by Threads (MB)"])
-ci_memory_threads = confidence_interval(popt_memory_threads, pcov_memory_threads)
+try:
+    popt_memory_threads, pcov_memory_threads = curve_fit(
+        exponential_func, df_threads["Scaled Threads"], df_threads["Memory Used by Threads (MB)"]
+    )
+    ci_memory_threads = confidence_interval(popt_memory_threads, pcov_memory_threads)
+    p_values_memory_threads = calculate_p_values(popt_memory_threads, pcov_memory_threads)
+    r2_memory_threads = np.corrcoef(df_threads["Memory Used by Threads (MB)"], exponential_func(df_threads["Scaled Threads"], *popt_memory_threads))[0, 1] ** 2
+except Exception as e:
+    popt_memory_threads, ci_memory_threads, p_values_memory_threads, r2_memory_threads = [None, None], [None, None], [None, None], None
+    print(f"Erro no ajuste para Nº de Threads vs Memory Used: {e}")
 
 # Ajuste para 'Nº de Clientes vs Total Time Taken'
 popt_time_clients, pcov_time_clients = curve_fit(exponential_func, df_clients["Nº de Clientes"], df_clients["Total Time Taken (s)"])
 ci_time_clients = confidence_interval(popt_time_clients, pcov_time_clients)
+p_values_time_clients = calculate_p_values(popt_time_clients, pcov_time_clients)
+r2_time_clients = np.corrcoef(df_clients["Total Time Taken (s)"], exponential_func(df_clients["Nº de Clientes"], *popt_time_clients))[0, 1] ** 2
 
 # Ajuste para 'Nº de Clientes vs Memory Used'
 popt_memory_clients, pcov_memory_clients = curve_fit(exponential_func, df_clients["Nº de Clientes"], df_clients["Memory Used (MB)"])
 ci_memory_clients = confidence_interval(popt_memory_clients, pcov_memory_clients)
+p_values_memory_clients = calculate_p_values(popt_memory_clients, pcov_memory_clients)
+r2_memory_clients = np.corrcoef(df_clients["Memory Used (MB)"], exponential_func(df_clients["Nº de Clientes"], *popt_memory_clients))[0, 1] ** 2
+
+# Estatísticas: Média e Desvio Padrão
+means_threads = df_threads.mean()
+std_devs_threads = df_threads.std()
+
+means_clients = df_clients.mean()
+std_devs_clients = df_clients.std()
 
 # Impressão dos resultados
 print("Regressão Exponencial para Threads:")
-print(f"Nº de Threads vs Total Time Taken (s): a = {popt_time_threads[0]:.3f}, b = {popt_time_threads[1]:.3f}, CI = ±{ci_time_threads}")
-print(f"Nº de Threads vs Memory Used by Threads (MB): a = {popt_memory_threads[0]:.3f}, b = {popt_memory_threads[1]:.3f}, CI = ±{ci_memory_threads}")
+if popt_time_threads[0] is not None:
+    print(f"Nº de Threads vs Total Time Taken (s): a = {popt_time_threads[0]:.3f}, b = {popt_time_threads[1]:.3f}, CI = ±{ci_time_threads}, p-values = {p_values_time_threads}, R² = {r2_time_threads:.3f}")
+else:
+    print("Nº de Threads vs Total Time Taken (s): Ajuste não realizado com sucesso.")
+
+if popt_memory_threads[0] is not None:
+    print(f"Nº de Threads vs Memory Used by Threads (MB): a = {popt_memory_threads[0]:.3f}, b = {popt_memory_threads[1]:.3f}, CI = ±{ci_memory_threads}, p-values = {p_values_memory_threads}, R² = {r2_memory_threads:.3f}")
+else:
+    print("Nº de Threads vs Memory Used by Threads (MB): Ajuste não realizado com sucesso.")
+
+print("\nMédias e Desvios Padrões para Threads:")
+print("Médias:", means_threads)
+print("Desvios Padrões:", std_devs_threads)
 
 print("\nRegressão Exponencial para Clientes:")
-print(f"Nº de Clientes vs Total Time Taken (s): a = {popt_time_clients[0]:.3f}, b = {popt_time_clients[1]:.3f}, CI = ±{ci_time_clients}")
-print(f"Nº de Clientes vs Memory Used (MB): a = {popt_memory_clients[0]:.3f}, b = {popt_memory_clients[1]:.3f}, CI = ±{ci_memory_clients}")
+print(f"Nº de Clientes vs Total Time Taken (s): a = {popt_time_clients[0]:.3f}, b = {popt_time_clients[1]:.3f}, CI = ±{ci_time_clients}, p-values = {p_values_time_clients}, R² = {r2_time_clients:.3f}")
+print(f"Nº de Clientes vs Memory Used (MB): a = {popt_memory_clients[0]:.3f}, b = {popt_memory_clients[1]:.3f}, CI = ±{ci_memory_clients}, p-values = {p_values_memory_clients}, R² = {r2_memory_clients:.3f}")
 
-# Exemplo de cálculo do R² para ajustar regressão exponencial
-def r_squared(y, y_pred):
-    ss_total = np.sum((y - np.mean(y))**2)
-    ss_residual = np.sum((y - y_pred)**2)
-    return 1 - (ss_residual / ss_total)
-
-# Cálculo de R²
-r2_time_threads = r_squared(df_threads["Total Time Taken (s)"], exponential_func(df_threads["Nº de Threads"], *popt_time_threads))
-r2_memory_threads = r_squared(df_threads["Memory Used by Threads (MB)"], exponential_func(df_threads["Nº de Threads"], *popt_memory_threads))
-r2_time_clients = r_squared(df_clients["Total Time Taken (s)"], exponential_func(df_clients["Nº de Clientes"], *popt_time_clients))
-r2_memory_clients = r_squared(df_clients["Memory Used (MB)"], exponential_func(df_clients["Nº de Clientes"], *popt_memory_clients))
-
-# Impressão do R²
-print("\nR² para Threads:")
-print(f"Nº de Threads vs Total Time Taken (s): R² = {r2_time_threads:.3f}")
-print(f"Nº de Threads vs Memory Used by Threads (MB): R² = {r2_memory_threads:.3f}")
-
-print("\nR² para Clientes:")
-print(f"Nº de Clientes vs Total Time Taken (s): R² = {r2_time_clients:.3f}")
-print(f"Nº de Clientes vs Memory Used (MB): R² = {r2_memory_clients:.3f}")
+print("\nMédias e Desvios Padrões para Clientes:")
+print("Médias:", means_clients)
+print("Desvios Padrões:", std_devs_clients)

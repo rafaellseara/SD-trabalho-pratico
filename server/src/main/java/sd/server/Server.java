@@ -27,7 +27,6 @@ public class Server {
     private final MyThreadSafeMap<String, LockConditionPair> conditionMap;
     private final MyThreadSafeMap<String, byte[]> valueConditionMap;
     private final MyThreadSafePool threadPool;
-    private final Lock lock;
     private final Lock clientSlotLock;
     private final Condition clientSlotAvailable;
     private final int maxConcurrentClients;
@@ -44,9 +43,8 @@ public class Server {
         this.conditionMap = new MyThreadSafeMap<>();
         this.valueConditionMap = new MyThreadSafeMap<>();
         this.threadPool = new MyThreadSafePool(maxConcurrentThreads);
-        this.lock = new ReentrantLock();
         this.clientSlotLock = new ReentrantLock();
-        this.clientSlotAvailable = lock.newCondition();
+        this.clientSlotAvailable = clientSlotLock.newCondition();
         this.maxConcurrentClients = maxConcurrentClients;
         this.currentClientCount = new AtomicInteger(0);
     }
