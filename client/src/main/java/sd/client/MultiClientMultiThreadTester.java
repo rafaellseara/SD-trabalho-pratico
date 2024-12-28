@@ -21,6 +21,12 @@ public class MultiClientMultiThreadTester {
             System.out.print("Enter the number of clients to connect: ");
             int numClients = scanner.nextInt();
 
+            System.out.print("Enter the number of threads per client: ");
+            int numThreads = scanner.nextInt();
+
+            System.out.print("Enter the total number of operations per client: ");
+            int totalOperations = scanner.nextInt();
+
             List<ClientConfig> clientConfigs = new ArrayList<>();
             List<Client> clients = new ArrayList<>();
 
@@ -42,13 +48,7 @@ public class MultiClientMultiThreadTester {
                 client.startReceivingThread();
                 clients.add(client);
 
-                // Get configuration for this client
-                System.out.println("\nConfiguring client " + i + "...");
-                System.out.print("Enter the number of threads: ");
-                int numThreads = scanner.nextInt();
-                System.out.print("Enter the total number of operations: ");
-                int totalOperations = scanner.nextInt();
-
+                // Use the same configuration for all clients
                 clientConfigs.add(new ClientConfig(client, authClientID, numThreads, totalOperations, i));
             }
 
@@ -161,4 +161,3 @@ public class MultiClientMultiThreadTester {
         }
     }
 }
-
