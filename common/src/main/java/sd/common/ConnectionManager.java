@@ -47,6 +47,7 @@ public class ConnectionManager implements AutoCloseable {
         this.connectionException = null;
     }
 
+    // This method is used to start a thread that will be responsible for receiving messages
     public void startReceivingThread() {
         this.conditions = new MyThreadSafeMap<>();
         this.messageQueues = new MyThreadSafeMap<>();
@@ -62,6 +63,7 @@ public class ConnectionManager implements AutoCloseable {
                             messageQueues.put(tag, new ArrayDeque<>());
                             conditions.put(tag, lock.newCondition());
                         }
+                        // Add the received message to the queue and signal the condition
                         messageQueues.get(tag).add(receivedPacket.getMessage());
                         conditions.get(tag).signal();
                     } finally {
@@ -89,11 +91,13 @@ public class ConnectionManager implements AutoCloseable {
     public Message receive(long tag) {
         lock.lock();
         try {
+            // If the tag is not in the map, add it
             if (!conditions.containsKey(tag)) {
                 conditions.put(tag, lock.newCondition());
                 messageQueues.put(tag, new ArrayDeque<>());
             }
 
+            // Wait until a message is received
             Condition condition = conditions.get(tag);
             Deque<Message> queue = messageQueues.get(tag);
 

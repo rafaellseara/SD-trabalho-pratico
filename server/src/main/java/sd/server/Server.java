@@ -67,6 +67,7 @@ public class Server {
             while (this.running) {
                 try {
                     Socket clientSocket = serverSocket.accept();
+                    // Wait for a slot to be available if max concurrent clients reached
                     if (currentClientCount.incrementAndGet() > maxConcurrentClients) {
                         clientSlotLock.lock();
                         try {
@@ -113,6 +114,7 @@ public class Server {
             boolean authenticated = false;
             int authUserId = -1;
 
+            // Authenticate user
             while (!authenticated) {
                 ConnectionManager.Packet authPacket = connectionManager.receivePacket();
                 if (authPacket.getMessage() instanceof AuthRequest authRequest) {
@@ -133,8 +135,10 @@ public class Server {
             }
 
             int userId = authUserId;
+            // Start a new thread to handle client responses
             new Thread(() -> handleClientResponses(connectionManager, userId)).start();
 
+            // Handle client requests
             while (this.running) {
                 ConnectionManager.Packet request = connectionManager.receivePacket();
                 if (request != null) {
@@ -150,11 +154,13 @@ public class Server {
     private void handleClientResponses(ConnectionManager connectionManager, int userId) {
         MyThreadSafeQueue<ConnectionManager.Packet> clientQueue = responseQueues.get(userId);
 
+        // Create a new response queue if not present
         if (clientQueue == null) {
             clientQueue = new MyThreadSafeQueue<>();
             responseQueues.put(userId, clientQueue);
         }
 
+        // Send responses to client
         while (this.running) {
             ConnectionManager.Packet response = clientQueue.poll();
             if (response != null) {
@@ -172,13 +178,16 @@ public class Server {
         while (this.running) {
             List<ConnectionManager.Packet> batch = new ArrayList<>();
 
+            // Get requests in batch
             for (int i = 0; i < BATCH_SIZE; i++) {
                 ConnectionManager.Packet request = requestQueue.poll();
                 if (request == null) break;
                 batch.add(request);
             }
 
+            // Process requests in batch
             for (ConnectionManager.Packet request : batch) {
+                // Process request in a separate thread from the thread pool
                 threadPool.submit(() -> {
                     logInfo("Processing request from queue: " + request.getMessage());
                     Message responseMessage;
@@ -224,6 +233,7 @@ public class Server {
                             String conditionKey = getWhenRequest.getKeyCond();
                             byte[] conditionValue = getWhenRequest.getValueCond();
 
+                            // Pair Condition with Lock
                             LockConditionPair pair = conditionMap.computeIfAbsent(conditionKey, k -> new LockConditionPair());
                             pair.lock();
                             try {
@@ -267,6 +277,7 @@ public class Server {
                         default -> throw new IllegalStateException("Unexpected value: " + request.getMessage());
                     }
 
+                    // Add response to client-specific queue
                     MyThreadSafeQueue<ConnectionManager.Packet> clientQueue = responseQueues.get(responseMessage.getClientID());
                     if (clientQueue == null) {
                         clientQueue = new MyThreadSafeQueue<>();
@@ -279,6 +290,7 @@ public class Server {
         }
     }
 
+    // Check if the current value matches the expected value
     private boolean matchesCondition(String key, byte[] expectedValue) {
         byte[] currentValue = valueConditionMap.get(key);
         return currentValue != null && java.util.Arrays.equals(currentValue, expectedValue);
