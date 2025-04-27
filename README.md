@@ -1,5 +1,9 @@
 # Shared Key-Value Storage Service
 
+---
+## Grade: 16/20 ⭐
+---
+
 This project implements a **Shared Key-Value Storage Service**, where data is maintained on a server and accessed remotely by clients via TCP sockets. The system supports concurrent client interactions and multi-threaded operations, making it suitable for scenarios requiring efficient shared data management.
 
 ## Features
